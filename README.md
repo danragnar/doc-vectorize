@@ -44,6 +44,13 @@ python doc_vectorize.py query "your question here"
 ```
 *Requires OPENAI_API_KEY.*
 
+#### Chat with AI
+Start an interactive chat session with conversation history:
+```
+python doc_vectorize.py chat
+```
+Type your questions, and the AI will respond with context from documents. Type 'exit' or 'quit' to end. *Requires OPENAI_API_KEY.*
+
 ### Web UI
 
 Launch the interactive web interface:
@@ -77,7 +84,12 @@ streamlit run ui.py
    python doc_vectorize.py query "What is the capital of France?"
    ```
 
-4. Launch UI:
+4. Start a chat session:
+   ```
+   python doc_vectorize.py chat
+   ```
+
+5. Launch UI:
    ```
    streamlit run ui.py
    ```

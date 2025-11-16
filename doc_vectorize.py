@@ -1,3 +1,4 @@
+#!env python
 import os
 import sys
 from PyPDF2 import PdfReader
@@ -113,7 +114,7 @@ def query_pipeline(query, index, chunks, model_name='all-MiniLM-L6-v2', openai_a
 def main():
     if len(sys.argv) < 2:
         print("Usage: python doc_vectorize.py <command> [args]")
-        print("Commands: ingest <input_dir>, query <question>, search <question>")
+        print("Commands: ingest <input_dir>, query <question>, search <question>, chat")
         return
     
     command = sys.argv[1]
@@ -154,6 +155,45 @@ def main():
         print("Relevant chunks:")
         for i, chunk in enumerate(relevant_chunks, 1):
             print(f"{i}. {chunk}\n---")
+    
+    elif command == 'chat':
+        index, chunks = load_vector_store()
+        history = []
+        print("Start chatting! Type 'exit' or 'quit' to end.")
+        while True:
+            try:
+                question = input("You: ")
+            except EOFError:
+                break
+            if question.lower() in ['exit', 'quit']:
+                break
+            
+            # Retrieve context
+            model = SentenceTransformer('all-MiniLM-L6-v2')
+            query_emb = model.encode([question])[0]
+            relevant_chunks = search_similar(query_emb, index, chunks)
+            context = "\n".join(relevant_chunks)
+            
+            # Build messages with history
+            messages = [{"role": "system", "content": f"Context from documents: {context}"}] + history + [
+                {"role": "user", "content": question}
+            ]
+            
+            # Call OpenAI
+            import openai
+            openai.api_key = os.getenv('OPENAI_API_KEY')
+            if not openai.api_key:
+                print("Error: OPENAI_API_KEY not set.")
+                break
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=messages
+            )
+            answer = response.choices[0].message.content
+            
+            print(f"AI: {answer}")
+            history.append({"role": "user", "content": question})
+            history.append({"role": "assistant", "content": answer})
 
 if __name__ == "__main__":
     main()
