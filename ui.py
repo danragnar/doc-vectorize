@@ -6,6 +6,7 @@ from doc_vectorize import load_vector_store, search_similar, load_document, chun
 import numpy as np
 import faiss
 import openai
+import torch
 
 st.title("Document Vectorizer UI")
 
@@ -29,7 +30,7 @@ if st.button("Ingest Documents"):
             # For simplicity, we'll recreate from chunks, but this is inefficient
             # Better to store embeddings separately, but for now, warn
             st.warning("Appending to existing store. Note: This recreates embeddings for existing chunks.")
-            model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+            model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B', model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto", "torch_dtype": torch.float16}, tokenizer_kwargs={"padding_side": "left"} )
             existing_texts = [item["text"] for item in existing_metadata]
             existing_embeddings = model.encode(existing_texts)
             all_embeddings.extend(existing_embeddings)
@@ -102,7 +103,7 @@ with tab1:
     with col1:
         if st.button("Search Locally", key="search_local"):
             if search_query:
-                model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+                model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B', model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto", "torch_dtype": torch.float16}, tokenizer_kwargs={"padding_side": "left"} )
                 query_emb = model.encode([search_query])[0]
                 relevant_metadata = search_similar(query_emb, index, metadata)
                 
@@ -150,7 +151,7 @@ with tab1:
             if search_query:
                 try:
                     # Get context from search query
-                    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+                    model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B', model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto", "torch_dtype": torch.float16}, tokenizer_kwargs={"padding_side": "left"} )
                     query_emb = model.encode([search_query])[0]
                     relevant_metadata = search_similar(query_emb, index, metadata)
                     context_parts = []
@@ -213,7 +214,7 @@ with tab2:
             st.session_state.history.append({"role": "user", "content": chat_ai_message})
             
             # Retrieve context with date filter
-            model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+            model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B', model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto", "torch_dtype": torch.float16}, tokenizer_kwargs={"padding_side": "left"} )
             query_emb = model.encode([chat_search_query])[0]
             relevant_metadata = search_similar(query_emb, index, metadata)
             

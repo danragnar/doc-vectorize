@@ -6,6 +6,7 @@ from docx import Document
 from sentence_transformers import SentenceTransformer
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
+import torch
 
 from langchain.chains import RetrievalQA
 import faiss
@@ -71,9 +72,9 @@ def chunk_text(text, chunk_size=1000, chunk_overlap=200):
     )
     return splitter.split_text(text)
 
-def generate_embeddings_local(chunks, model_name='paraphrase-multilingual-MiniLM-L12-v2'):
+def generate_embeddings_local(chunks, model_name='Qwen/Qwen3-Embedding-0.6B'):
     """Generate embeddings using local sentence-transformers model."""
-    model = SentenceTransformer(model_name)
+    model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B', model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto", "torch_dtype": torch.float16}, tokenizer_kwargs={"padding_side": "left"} )
     embeddings = model.encode(chunks)
     return embeddings
 
@@ -110,12 +111,12 @@ def search_similar(query_embedding, index, metadata, k=5):
     results = [metadata[i] for i in indices[0]]
     return results
 
-def query_pipeline(query, index, metadata, model_name='paraphrase-multilingual-MiniLM-L12-v2', openai_api_key=None):
+def query_pipeline(query, index, metadata, model_name='Qwen/Qwen3-Embedding-0.6B', openai_api_key=None):
     """Query pipeline with retrieval and ChatGPT."""
     import openai
     
     # Generate query embedding
-    model = SentenceTransformer(model_name)
+    model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B', model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto", "torch_dtype": torch.float16}, tokenizer_kwargs={"padding_side": "left"} )
     query_emb = model.encode([query])[0]
     
     # Retrieve similar metadata
@@ -230,7 +231,7 @@ def main():
         from_date = args.from_date
         to_date = args.to_date
         index, metadata = load_vector_store()
-        model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+        model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B', model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto", "torch_dtype": torch.float16}, tokenizer_kwargs={"padding_side": "left"} )
         query_emb = model.encode([question])[0]
         relevant_metadata = search_similar(query_emb, index, metadata)
         
@@ -277,7 +278,7 @@ def main():
                 break
             
             # Retrieve context
-            model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+            model = SentenceTransformer('Qwen/Qwen3-Embedding-0.6B', model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto", "torch_dtype": torch.float16}, tokenizer_kwargs={"padding_side": "left"} )
             query_emb = model.encode([question])[0]
             relevant_metadata = search_similar(query_emb, index, metadata)
             context_parts = []
