@@ -4,10 +4,11 @@ A tool for ingesting documents (PDF/DOCX) into a vector store and querying them 
 
 ## Features
 
-- **Ingestion**: Extract text from PDF and DOCX files, chunk it, generate embeddings, and store in a FAISS vector index.
-- **Search**: Perform semantic search to retrieve relevant document chunks locally.
-- **Query**: Use retrieved chunks as context for AI-generated answers (requires OpenAI API key).
-- **UI**: Web-based interface for easy interaction (upload documents, search, query).
+- **Ingestion**: Extract text and metadata (creation/modification dates) from PDF and DOCX files, chunk text, generate multilingual embeddings, and store in a FAISS vector index with content-addressable file storage.
+- **Search**: Perform semantic search to retrieve relevant document chunks, with optional date filtering.
+- **Query**: Use retrieved chunks (including source metadata) as context for AI-generated answers via OpenAI.
+- **Chat**: Interactive conversational mode with history, date-scoped retrieval, and separate search/AI prompts.
+- **UI**: Web-based interface with tabs for single queries and chat, file uploads, downloads, and date filters.
 
 ## Installation
 
@@ -58,8 +59,9 @@ Launch the interactive web interface:
 ```
 streamlit run ui.py
 ```
-- Upload and ingest new documents (stored locally for download).
-- Enter separate search queries and AI questions for precise control.
+- **Single Query Tab**: Enter search query and AI question separately, with date filters; search locally or query AI with enriched context (file names, dates).
+- **Chat Tab**: Conversational chat with history, separate search/AI inputs, date filters, and AI responses based on retrieved context.
+- Upload and ingest new documents (content-addressable storage).
 - Download original documents from search results.
 - Access at http://localhost:8501 (default).
 
@@ -106,8 +108,17 @@ streamlit run ui.py
 ## Notes
 
 - The vector store is saved as `vector_store.index` and `vector_store.index.metadata`.
-- Original documents are stored content-addressably in `stored_documents/` using SHA256 hashes with subdirectories (e.g., `ab/abc123.pdf`) for better organization.
-- Ingestion supports PDF and DOCX files.
-- Embeddings are generated using the `paraphrase-multilingual-MiniLM-L12-v2` model, which supports multiple languages including Swedish.
+- Original documents are stored content-addressably in `stored_documents/` using SHA256 hashes with subdirectories (e.g., `ab/abc123.pdf`) for deduplication and organization.
+- Ingestion supports PDF and DOCX files, extracting text and metadata (creation/modification dates).
+- Embeddings are generated using the `paraphrase-multilingual-MiniLM-L12-v2` model, supporting multiple languages including Swedish.
+- AI context includes source file names and dates for better attribution.
+- Search and chat support date filtering by document modification dates.
+- Ingestion appends to existing vector stores; re-ingest to update with new features.
 - For large document sets, ingestion may take time due to embedding generation.
 - The UI allows incremental ingestion by uploading files.
+
+## Troubleshooting
+
+- **PDF Ingestion Errors**: If PDFs lack metadata, dates may not be extracted—ingestion will continue without them.
+- **OpenAI Quota Issues**: Ensure your API key has credits; check [OpenAI Billing](https://platform.openai.com/account/billing).
+- **Large Files**: For very large document sets, consider batching ingestion or optimizing FAISS for append-only updates.
