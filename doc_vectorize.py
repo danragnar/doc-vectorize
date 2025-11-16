@@ -64,46 +64,46 @@ def create_vector_store(chunks, embeddings):
     # Store chunks as metadata
     return index, chunks
 
-def save_vector_store(index, chunks, save_path='vector_store.index'):
-    """Save FAISS index and chunks."""
+def save_vector_store(index, metadata, save_path='vector_store.index'):
+    """Save FAISS index and metadata."""
     faiss.write_index(index, save_path)
-    with open(save_path + '.chunks', 'w') as f:
-        for chunk in chunks:
-            f.write(chunk + '\n---\n')
+    import json
+    with open(save_path + '.metadata', 'w') as f:
+        json.dump(metadata, f)
 
 def load_vector_store(load_path='vector_store.index'):
-    """Load FAISS index and chunks."""
+    """Load FAISS index and metadata."""
     index = faiss.read_index(load_path)
-    with open(load_path + '.chunks', 'r') as f:
-        content = f.read()
-        chunks = content.split('\n---\n')[:-1]  # Remove last empty
-    return index, chunks
+    import json
+    with open(load_path + '.metadata', 'r') as f:
+        metadata = json.load(f)
+    return index, metadata
 
-def search_similar(query_embedding, index, chunks, k=5):
-    """Search for similar chunks."""
+def search_similar(query_embedding, index, metadata, k=5):
+    """Search for similar metadata."""
     query_emb = query_embedding.reshape(1, -1)
     distances, indices = index.search(query_emb, k)
-    results = [chunks[i] for i in indices[0]]
+    results = [metadata[i] for i in indices[0]]
     return results
 
-def query_pipeline(query, index, chunks, model_name='paraphrase-multilingual-MiniLM-L12-v2', openai_api_key=None):
+def query_pipeline(query, index, metadata, model_name='paraphrase-multilingual-MiniLM-L12-v2', openai_api_key=None):
     """Query pipeline with retrieval and ChatGPT."""
     import openai
-
+    
     # Generate query embedding
     model = SentenceTransformer(model_name)
     query_emb = model.encode([query])[0]
-
-    # Retrieve similar chunks
-    relevant_chunks = search_similar(query_emb, index, chunks)
-    context = "\n".join(relevant_chunks)
-
+    
+    # Retrieve similar metadata
+    relevant_metadata = search_similar(query_emb, index, metadata)
+    context = "\n".join([item["text"] for item in relevant_metadata])
+    
     # Use ChatGPT for answer
     if not openai_api_key:
         openai_api_key = os.getenv('OPENAI_API_KEY')
     if not openai_api_key:
         raise ValueError("OpenAI API key required")
-
+    
     openai.api_key = openai_api_key
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -121,7 +121,7 @@ def main():
     
     if command == 'ingest':
         input_dir = sys.argv[2]
-        all_chunks = []
+        all_metadata = []
         all_embeddings = []
         
         for file in os.listdir(input_dir):
@@ -130,34 +130,35 @@ def main():
                 text = load_document(file_path)
                 chunks = chunk_text(text)
                 embeddings = generate_embeddings_local(chunks)
-                all_chunks.extend(chunks)
+                for chunk in chunks:
+                    all_metadata.append({"text": chunk, "file": file_path})
                 all_embeddings.extend(embeddings)
         
         # Convert to numpy array
         import numpy as np
         all_embeddings = np.array(all_embeddings)
-        index, chunks = create_vector_store(all_chunks, all_embeddings)
-        save_vector_store(index, chunks)
+        index, metadata = create_vector_store(all_metadata, all_embeddings)
+        save_vector_store(index, metadata)
         print("Ingestion complete")
     
     elif command == 'query':
         question = ' '.join(sys.argv[2:])
-        index, chunks = load_vector_store()
-        answer = query_pipeline(question, index, chunks)
+        index, metadata = load_vector_store()
+        answer = query_pipeline(question, index, metadata)
         print(answer)
     
     elif command == 'search':
         question = ' '.join(sys.argv[2:])
-        index, chunks = load_vector_store()
+        index, metadata = load_vector_store()
         model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
         query_emb = model.encode([question])[0]
-        relevant_chunks = search_similar(query_emb, index, chunks)
+        relevant_metadata = search_similar(query_emb, index, metadata)
         print("Relevant chunks:")
-        for i, chunk in enumerate(relevant_chunks, 1):
-            print(f"{i}. {chunk}\n---")
+        for i, item in enumerate(relevant_metadata, 1):
+            print(f"{i}. {item['text']} (from {item['file']})\n---")
     
     elif command == 'chat':
-        index, chunks = load_vector_store()
+        index, metadata = load_vector_store()
         history = []
         print("Start chatting! Type 'exit' or 'quit' to end.")
         while True:
@@ -171,8 +172,8 @@ def main():
             # Retrieve context
             model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
             query_emb = model.encode([question])[0]
-            relevant_chunks = search_similar(query_emb, index, chunks)
-            context = "\n".join(relevant_chunks)
+            relevant_metadata = search_similar(query_emb, index, metadata)
+            context = "\n".join([item["text"] for item in relevant_metadata])
             
             # Build messages with history
             messages = [{"role": "system", "content": f"Context from documents: {context}"}] + history + [

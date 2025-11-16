@@ -14,19 +14,20 @@ st.header("Ingest New Documents")
 uploaded_files = st.file_uploader("Upload PDF or DOCX files", type=["pdf", "docx"], accept_multiple_files=True)
 if st.button("Ingest Documents"):
     if uploaded_files:
-        all_chunks = []
+        all_metadata = []
         all_embeddings = []
         
         # If vector store exists, load existing
         if os.path.exists('vector_store.index'):
-            index, existing_chunks = load_vector_store()
-            all_chunks.extend(existing_chunks)
-            # Reconstruct embeddings from existing chunks (approximate, since FAISS doesn't store originals)
-            # For simplicity, we'll recreate from chunks, but this is inefficient
+            index, existing_metadata = load_vector_store()
+            all_metadata.extend(existing_metadata)
+            # Reconstruct embeddings from existing metadata (approximate, since FAISS doesn't store originals)
+            # For simplicity, we'll recreate from texts, but this is inefficient
             # Better to store embeddings separately, but for now, warn
             st.warning("Appending to existing store. Note: This recreates embeddings for existing chunks.")
             model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-            existing_embeddings = model.encode(existing_chunks)
+            existing_texts = [item["text"] for item in existing_metadata]
+            existing_embeddings = model.encode(existing_texts)
             all_embeddings.extend(existing_embeddings)
         
         for uploaded_file in uploaded_files:
@@ -37,13 +38,14 @@ if st.button("Ingest Documents"):
             text = load_document(tmp_path)
             chunks = chunk_text(text)
             embeddings = generate_embeddings_local(chunks)
-            all_chunks.extend(chunks)
+            for chunk in chunks:
+                all_metadata.append({"text": chunk, "file": uploaded_file.name})
             all_embeddings.extend(embeddings)
             os.unlink(tmp_path)  # Clean up
         
         all_embeddings = np.array(all_embeddings)
-        index, chunks = create_vector_store(all_chunks, all_embeddings)
-        save_vector_store(index, chunks)
+        index, metadata = create_vector_store(all_metadata, all_embeddings)
+        save_vector_store(index, metadata)
         st.success("Ingestion complete!")
         st.rerun()  # Refresh to load new index
     else:
@@ -54,8 +56,8 @@ if not os.path.exists('vector_store.index'):
     st.info("Upload and ingest documents to get started.")
     st.stop()
 
-# Load the index and chunks
-index, chunks = load_vector_store()
+# Load the index and metadata
+index, metadata = load_vector_store()
 
 # Mode selection with tabs
 tab1, tab2 = st.tabs(["Single Query", "Chat"])
@@ -70,10 +72,10 @@ with tab1:
             if query:
                 model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
                 query_emb = model.encode([query])[0]
-                relevant_chunks = search_similar(query_emb, index, chunks)
+                relevant_metadata = search_similar(query_emb, index, metadata)
                 st.subheader("Relevant Chunks:")
-                for i, chunk in enumerate(relevant_chunks, 1):
-                    st.write(f"**{i}.** {chunk}")
+                for i, item in enumerate(relevant_metadata, 1):
+                    st.write(f"**{i}.** {item['text']} (from {item['file']})")
                     st.divider()
             else:
                 st.warning("Please enter a query.")
@@ -85,8 +87,8 @@ with tab1:
                     # Simulate query_pipeline
                     model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
                     query_emb = model.encode([query])[0]
-                    relevant_chunks = search_similar(query_emb, index, chunks)
-                    context = "\n".join(relevant_chunks)
+                    relevant_metadata = search_similar(query_emb, index, metadata)
+                    context = "\n".join([item["text"] for item in relevant_metadata])
                     
                     openai.api_key = os.getenv('OPENAI_API_KEY')
                     if not openai.api_key:
@@ -129,8 +131,8 @@ with tab2:
             # Retrieve context
             model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
             query_emb = model.encode([new_message])[0]
-            relevant_chunks = search_similar(query_emb, index, chunks)
-            context = "\n".join(relevant_chunks)
+            relevant_metadata = search_similar(query_emb, index, metadata)
+            context = "\n".join([item["text"] for item in relevant_metadata])
             
             # Build messages
             messages = [{"role": "system", "content": f"Context from documents: {context}"}] + st.session_state.history
