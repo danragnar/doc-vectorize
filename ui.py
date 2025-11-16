@@ -153,7 +153,15 @@ with tab1:
                     model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
                     query_emb = model.encode([search_query])[0]
                     relevant_metadata = search_similar(query_emb, index, metadata)
-                    context = "\n".join([item["text"] for item in relevant_metadata])
+                    context_parts = []
+                    for item in relevant_metadata:
+                        file_info = f"From {item['file']}"
+                        if item.get('created'):
+                            file_info += f" (created: {item['created']})"
+                        if item.get('modified'):
+                            file_info += f" (modified: {item['modified']})"
+                        context_parts.append(f"{file_info}: {item['text']}")
+                    context = "\n".join(context_parts)
                     
                     # Use AI question if provided, else search query
                     question = ai_question if ai_question else search_query
@@ -229,7 +237,15 @@ with tab2:
                         filtered.append(item)
                 relevant_metadata = filtered
             
-            context = "\n".join([item["text"] for item in relevant_metadata])
+            context_parts = []
+            for item in relevant_metadata:
+                file_info = f"From {item['file']}"
+                if item.get('created'):
+                    file_info += f" (created: {item['created']})"
+                if item.get('modified'):
+                    file_info += f" (modified: {item['modified']})"
+                context_parts.append(f"{file_info}: {item['text']}")
+            context = "\n".join(context_parts)
             
             # Build messages
             messages = [{"role": "system", "content": f"Context from documents: {context}"}] + st.session_state.history

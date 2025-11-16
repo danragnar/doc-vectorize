@@ -32,20 +32,26 @@ def load_docx(file_path):
 
 def extract_doc_metadata(file_path):
     """Extract creation and modification dates from document metadata."""
-    if file_path.endswith('.pdf'):
-        reader = PdfReader(file_path)
-        info = reader.metadata
-        return {
-            "created": info.creation_date.isoformat() if info.creation_date else None,
-            "modified": info.mod_date.isoformat() if info.mod_date else None
-        }
-    elif file_path.endswith('.docx'):
-        doc = Document(file_path)
-        props = doc.core_properties
-        return {
-            "created": props.created.isoformat() if props.created else None,
-            "modified": props.modified.isoformat() if props.modified else None
-        }
+    try:
+        if file_path.endswith('.pdf'):
+            reader = PdfReader(file_path)
+            info = reader.metadata
+            created = getattr(info, 'creation_date', None)
+            modified = getattr(info, 'modification_date', None)
+            print(created)
+            return {
+                "created": created.isoformat() if created else None,
+                "modified": modified.isoformat() if modified else None
+            }
+        elif file_path.endswith('.docx'):
+            doc = Document(file_path)
+            props = doc.core_properties
+            return {
+                "created": props.created.isoformat() if props.created else None,
+                "modified": props.modified.isoformat() if props.modified else None
+            }
+    except Exception:
+        pass
     return {}
 
 def load_document(file_path):
@@ -114,7 +120,15 @@ def query_pipeline(query, index, metadata, model_name='paraphrase-multilingual-M
     
     # Retrieve similar metadata
     relevant_metadata = search_similar(query_emb, index, metadata)
-    context = "\n".join([item["text"] for item in relevant_metadata])
+    context_parts = []
+    for item in relevant_metadata:
+        file_info = f"From {item['file']}"
+        if item.get('created'):
+            file_info += f" (created: {item['created']})"
+        if item.get('modified'):
+            file_info += f" (modified: {item['modified']})"
+        context_parts.append(f"{file_info}: {item['text']}")
+    context = "\n".join(context_parts)
     
     # Use ChatGPT for answer
     if not openai_api_key:
@@ -266,7 +280,15 @@ def main():
             model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
             query_emb = model.encode([question])[0]
             relevant_metadata = search_similar(query_emb, index, metadata)
-            context = "\n".join([item["text"] for item in relevant_metadata])
+            context_parts = []
+            for item in relevant_metadata:
+                file_info = f"From {item['file']}"
+                if item.get('created'):
+                    file_info += f" (created: {item['created']})"
+                if item.get('modified'):
+                    file_info += f" (modified: {item['modified']})"
+                context_parts.append(f"{file_info}: {item['text']}")
+            context = "\n".join(context_parts)
             
             # Build messages with history
             messages = [{"role": "system", "content": f"Context from documents: {context}"}] + history + [
