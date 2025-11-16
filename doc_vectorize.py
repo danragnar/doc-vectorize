@@ -30,6 +30,24 @@ def load_docx(file_path):
                 text += cell.text + "\n"
     return text
 
+def extract_doc_metadata(file_path):
+    """Extract creation and modification dates from document metadata."""
+    if file_path.endswith('.pdf'):
+        reader = PdfReader(file_path)
+        info = reader.metadata
+        return {
+            "created": info.creation_date.isoformat() if info.creation_date else None,
+            "modified": info.mod_date.isoformat() if info.mod_date else None
+        }
+    elif file_path.endswith('.docx'):
+        doc = Document(file_path)
+        props = doc.core_properties
+        return {
+            "created": props.created.isoformat() if props.created else None,
+            "modified": props.modified.isoformat() if props.modified else None
+        }
+    return {}
+
 def load_document(file_path):
     """Load document based on file extension."""
     if file_path.endswith('.pdf'):
@@ -112,26 +130,72 @@ def query_pipeline(query, index, metadata, model_name='paraphrase-multilingual-M
     return response.choices[0].message.content
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python doc_vectorize.py <command> [args]")
-        print("Commands: ingest <input_dir>, query <question>, search <question>, chat")
+    import argparse
+    parser = argparse.ArgumentParser(description="Document Vectorizer")
+    subparsers = parser.add_subparsers(dest='command')
+
+    # Ingest
+    ingest_parser = subparsers.add_parser('ingest')
+    ingest_parser.add_argument('input_dir')
+
+    # Query
+    query_parser = subparsers.add_parser('query')
+    query_parser.add_argument('question', nargs='+')
+
+    # Search
+    search_parser = subparsers.add_parser('search')
+    search_parser.add_argument('question', nargs='+')
+    search_parser.add_argument('--from-date', help='From date (YYYY-MM-DD)')
+    search_parser.add_argument('--to-date', help='To date (YYYY-MM-DD)')
+
+    # Chat
+    chat_parser = subparsers.add_parser('chat')
+
+    args = parser.parse_args()
+    if not args.command:
+        parser.print_help()
         return
-    
-    command = sys.argv[1]
+
+    command = args.command
     
     if command == 'ingest':
-        input_dir = sys.argv[2]
+        input_dir = args.input_dir
         all_metadata = []
         all_embeddings = []
+        
+        # Create stored_documents folder
+        stored_dir = 'stored_documents'
+        os.makedirs(stored_dir, exist_ok=True)
+        
+        import hashlib
+        import shutil
         
         for file in os.listdir(input_dir):
             if file.endswith(('.pdf', '.docx')):
                 file_path = os.path.join(input_dir, file)
+                
+                # Compute SHA256 hash
+                with open(file_path, 'rb') as f:
+                    file_hash = hashlib.sha256(f.read()).hexdigest()
+                
+                ext = file.split('.')[-1]
+                subdir = file_hash[:2]
+                subdir_path = os.path.join(stored_dir, subdir)
+                os.makedirs(subdir_path, exist_ok=True)
+                stored_filename = f"{file_hash}.{ext}"
+                stored_path = os.path.join(subdir_path, stored_filename)
+                
+                # Copy if not exists
+                if not os.path.exists(stored_path):
+                    shutil.copy2(file_path, stored_path)
+                
                 text = load_document(file_path)
+                doc_metadata = extract_doc_metadata(file_path)
                 chunks = chunk_text(text)
                 embeddings = generate_embeddings_local(chunks)
+                
                 for chunk in chunks:
-                    all_metadata.append({"text": chunk, "file": file_path})
+                    all_metadata.append({"text": chunk, "file": file, "stored_path": stored_path, **doc_metadata})
                 all_embeddings.extend(embeddings)
         
         # Convert to numpy array
@@ -142,20 +206,49 @@ def main():
         print("Ingestion complete")
     
     elif command == 'query':
-        question = ' '.join(sys.argv[2:])
+        question = ' '.join(args.question)
         index, metadata = load_vector_store()
         answer = query_pipeline(question, index, metadata)
         print(answer)
     
     elif command == 'search':
-        question = ' '.join(sys.argv[2:])
+        question = ' '.join(args.question)
+        from_date = args.from_date
+        to_date = args.to_date
         index, metadata = load_vector_store()
         model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
         query_emb = model.encode([question])[0]
         relevant_metadata = search_similar(query_emb, index, metadata)
+        
+        # Filter by date
+        if from_date or to_date:
+            from datetime import datetime
+            filtered = []
+            for item in relevant_metadata:
+                modified = item.get('modified')
+                if modified:
+                    try:
+                        mod_dt = datetime.fromisoformat(modified.replace('Z', '+00:00'))
+                        if from_date:
+                            from_dt = datetime.fromisoformat(from_date)
+                            if mod_dt < from_dt:
+                                continue
+                        if to_date:
+                            to_dt = datetime.fromisoformat(to_date)
+                            if mod_dt > to_dt:
+                                continue
+                        filtered.append(item)
+                    except:
+                        continue  # Skip if date parsing fails
+                else:
+                    filtered.append(item)  # Include if no date
+            relevant_metadata = filtered
+        
         print("Relevant chunks:")
         for i, item in enumerate(relevant_metadata, 1):
-            print(f"{i}. {item['text']} (from {item['file']})\n---")
+            date_info = f" (modified: {item.get('modified', 'unknown')})" if item.get('modified') else ""
+            print(f"{i}. {item['text']} (from {item['file']}){date_info}")
+            print("---")
     
     elif command == 'chat':
         index, metadata = load_vector_store()

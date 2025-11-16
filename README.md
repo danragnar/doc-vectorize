@@ -34,8 +34,9 @@ python doc_vectorize.py ingest /path/to/document/directory
 #### Search Locally
 Retrieve relevant chunks for a query without AI:
 ```
-python doc_vectorize.py search "your query here"
+python doc_vectorize.py search "your query here" [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD]
 ```
+*Filters results by document modification date.*
 
 #### Query with AI
 Get an AI-generated answer using retrieved context:
@@ -57,8 +58,9 @@ Launch the interactive web interface:
 ```
 streamlit run ui.py
 ```
-- Upload and ingest new documents.
-- Enter queries to search locally or query with AI.
+- Upload and ingest new documents (stored locally for download).
+- Enter separate search queries and AI questions for precise control.
+- Download original documents from search results.
 - Access at http://localhost:8501 (default).
 
 ## Requirements
@@ -79,24 +81,32 @@ streamlit run ui.py
    python doc_vectorize.py search "machine learning"
    ```
 
-3. Ask a question:
+3. Search with date filter:
+   ```
+   python doc_vectorize.py search "requirements" --from-date 2023-01-01 --to-date 2023-12-31
+   ```
+
+4. Ask a question:
    ```
    python doc_vectorize.py query "What is the capital of France?"
    ```
 
-4. Start a chat session:
+5. Start a chat session:
    ```
    python doc_vectorize.py chat
    ```
 
-5. Launch UI:
+6. Launch UI:
    ```
    streamlit run ui.py
    ```
+   - Use "Single Query" tab for search and AI with separate inputs.
+   - Use "Chat" tab for conversational queries.
 
 ## Notes
 
-- The vector store is saved as `vector_store.index` and `vector_store.index.chunks`.
+- The vector store is saved as `vector_store.index` and `vector_store.index.metadata`.
+- Original documents are stored content-addressably in `stored_documents/` using SHA256 hashes with subdirectories (e.g., `ab/abc123.pdf`) for better organization.
 - Ingestion supports PDF and DOCX files.
 - Embeddings are generated using the `paraphrase-multilingual-MiniLM-L12-v2` model, which supports multiple languages including Swedish.
 - For large document sets, ingestion may take time due to embedding generation.
