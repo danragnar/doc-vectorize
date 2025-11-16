@@ -98,5 +98,6 @@ streamlit run ui.py
 
 - The vector store is saved as `vector_store.index` and `vector_store.index.chunks`.
 - Ingestion supports PDF and DOCX files.
+- Embeddings are generated using the `paraphrase-multilingual-MiniLM-L12-v2` model, which supports multiple languages including Swedish.
 - For large document sets, ingestion may take time due to embedding generation.
 - The UI allows incremental ingestion by uploading files.

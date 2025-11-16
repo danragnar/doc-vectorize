@@ -25,7 +25,7 @@ if st.button("Ingest Documents"):
             # For simplicity, we'll recreate from chunks, but this is inefficient
             # Better to store embeddings separately, but for now, warn
             st.warning("Appending to existing store. Note: This recreates embeddings for existing chunks.")
-            model = SentenceTransformer('all-MiniLM-L6-v2')
+            model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
             existing_embeddings = model.encode(existing_chunks)
             all_embeddings.extend(existing_embeddings)
         
@@ -68,7 +68,7 @@ with tab1:
     with col1:
         if st.button("Search Locally", key="search_local"):
             if query:
-                model = SentenceTransformer('all-MiniLM-L6-v2')
+                model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
                 query_emb = model.encode([query])[0]
                 relevant_chunks = search_similar(query_emb, index, chunks)
                 st.subheader("Relevant Chunks:")
@@ -83,7 +83,7 @@ with tab1:
             if query:
                 try:
                     # Simulate query_pipeline
-                    model = SentenceTransformer('all-MiniLM-L6-v2')
+                    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
                     query_emb = model.encode([query])[0]
                     relevant_chunks = search_similar(query_emb, index, chunks)
                     context = "\n".join(relevant_chunks)
@@ -127,7 +127,7 @@ with tab2:
             st.session_state.history.append({"role": "user", "content": new_message})
             
             # Retrieve context
-            model = SentenceTransformer('all-MiniLM-L6-v2')
+            model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
             query_emb = model.encode([new_message])[0]
             relevant_chunks = search_similar(query_emb, index, chunks)
             context = "\n".join(relevant_chunks)

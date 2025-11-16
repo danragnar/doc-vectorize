@@ -47,7 +47,7 @@ def chunk_text(text, chunk_size=1000, chunk_overlap=200):
     )
     return splitter.split_text(text)
 
-def generate_embeddings_local(chunks, model_name='all-MiniLM-L6-v2'):
+def generate_embeddings_local(chunks, model_name='paraphrase-multilingual-MiniLM-L12-v2'):
     """Generate embeddings using local sentence-transformers model."""
     model = SentenceTransformer(model_name)
     embeddings = model.encode(chunks)
@@ -86,7 +86,7 @@ def search_similar(query_embedding, index, chunks, k=5):
     results = [chunks[i] for i in indices[0]]
     return results
 
-def query_pipeline(query, index, chunks, model_name='all-MiniLM-L6-v2', openai_api_key=None):
+def query_pipeline(query, index, chunks, model_name='paraphrase-multilingual-MiniLM-L12-v2', openai_api_key=None):
     """Query pipeline with retrieval and ChatGPT."""
     import openai
 
@@ -149,7 +149,7 @@ def main():
     elif command == 'search':
         question = ' '.join(sys.argv[2:])
         index, chunks = load_vector_store()
-        model = SentenceTransformer('all-MiniLM-L6-v2')
+        model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
         query_emb = model.encode([question])[0]
         relevant_chunks = search_similar(query_emb, index, chunks)
         print("Relevant chunks:")
@@ -169,7 +169,7 @@ def main():
                 break
             
             # Retrieve context
-            model = SentenceTransformer('all-MiniLM-L6-v2')
+            model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
             query_emb = model.encode([question])[0]
             relevant_chunks = search_similar(query_emb, index, chunks)
             context = "\n".join(relevant_chunks)
